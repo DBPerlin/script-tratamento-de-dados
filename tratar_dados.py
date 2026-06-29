@@ -73,7 +73,8 @@ def valida_cfn_api(categoria, regional, registro, nome, cpf):
             "options[nome]": "",
             "options[cpf]": "",
             "options[tecnico]": parametro_tecnico,
-            "options[situacao]": ""
+            "options[situacao]": "",
+            "options[geral]": "true"
         }
 
         try:
@@ -137,6 +138,9 @@ def processar_csv(arquivo_entrada, arquivo_saida):
         
         total_linhas = 0
         
+        # Set (memória) para guardar os CPFs que já passaram pelo script
+        cpfs_processados = set()
+        
         for row in reader:
             total_linhas += 1
             print(f"Processando linha {total_linhas}...", end=" ")
@@ -146,6 +150,25 @@ def processar_csv(arquivo_entrada, arquivo_saida):
             registro = row.get('Registro', '').strip()
             nome = row.get('Nome', '').strip()
             cpf = row.get('CPF', '').strip()
+
+            # Verificação de Duplicatas
+            # Limpa o CPF apenas para a checagem na memória (ignora pontos/traços)
+            cpf_limpo = re.sub(r'\D', '', cpf)
+            if len(cpf_limpo) == 10:
+                cpf_limpo = cpf_limpo.zfill(11)
+
+            # Se o CPF já estiver na memória, marca como duplicata e pula
+            if cpf_limpo and cpf_limpo in cpfs_processados:
+                row['Status_Validacao'] = 'Inválido'
+                row['Motivo_Erro'] = 'Duplicata'
+                print(row['Status_Validacao'])
+                writer.writerow(row)
+                continue
+            
+            # Adiciona o CPF novo na memória para as próximas iterações
+            if cpf_limpo:
+                cpfs_processados.add(cpf_limpo)
+            # =====================================================================
 
             # CPF é válido matematicamente?
             if not valida_cpf_matematica(cpf):
